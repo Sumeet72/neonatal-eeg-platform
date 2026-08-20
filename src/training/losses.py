@@ -10,10 +10,16 @@ def get_class_weights(labels):
         1D array/tensor containing 0 and 1.
     """
 
-    labels = torch.as_tensor(
-        labels,
-        dtype=torch.long
-    )
+    if isinstance(labels, torch.Tensor):
+
+        labels = labels.detach().clone().long()
+
+    else:
+
+        labels = torch.as_tensor(
+            labels,
+            dtype=torch.long
+        ).clone()
 
     counts = torch.bincount(
         labels,
