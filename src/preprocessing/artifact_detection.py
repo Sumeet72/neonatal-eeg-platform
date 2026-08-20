@@ -3,23 +3,19 @@ import numpy as np
 
 def check_eeg_quality(
     eeg,
-    min_amplitude=-500.0,
-    max_amplitude=500.0,
-    flat_std_threshold=1e-6,
-    max_nan_ratio=0.01
+    max_nan_ratio=0.01,
+    max_flat_channel_ratio=0.5
 ):
     """
     Basic EEG quality-control checks.
 
-    Parameters
-    ----------
-    eeg : numpy.ndarray
-        Shape: (channels, samples)
+    EEG shape:
+        (channels, samples)
 
-    Returns
-    -------
-    result : dict
-        Quality information and usability flag.
+    The flat-channel check is relative to the
+    median channel standard deviation so that
+    datasets with different physical amplitude
+    scales can be handled more safely.
     """
 
     eeg = np.asarray(
@@ -33,77 +29,94 @@ def check_eeg_quality(
             "(channels, samples)."
         )
 
-    # NaN / infinite values
+    # -----------------------------------------
+    # 1. NaN / infinite values
+    # -----------------------------------------
+
     invalid_values = ~np.isfinite(eeg)
 
     invalid_ratio = invalid_values.mean()
 
-    has_too_many_invalid = (
-        invalid_ratio > max_nan_ratio
-    )
+    if invalid_ratio > max_nan_ratio:
 
-    # Replace invalid values temporarily for
-    # amplitude/statistical calculations.
-    clean_values = eeg[
-        np.isfinite(eeg)
-    ]
-
-    if len(clean_values) == 0:
         return {
             "usable": False,
-            "reason": "No finite EEG samples"
+            "reason": "too_many_invalid_values",
+            "invalid_ratio": float(
+                invalid_ratio
+            )
         }
 
-    # Extreme amplitude check
-    min_value = float(
-        clean_values.min()
+    # -----------------------------------------
+    # 2. Replace invalid values temporarily
+    # -----------------------------------------
+
+    clean_eeg = np.nan_to_num(
+        eeg,
+        nan=0.0,
+        posinf=0.0,
+        neginf=0.0
     )
 
-    max_value = float(
-        clean_values.max()
-    )
+    # -----------------------------------------
+    # 3. Channel standard deviations
+    # -----------------------------------------
 
-    extreme_amplitude = (
-        min_value < min_amplitude
-        or max_value > max_amplitude
-    )
-
-    # Flat-channel check
     channel_std = np.std(
-        np.nan_to_num(eeg),
+        clean_eeg,
         axis=1
     )
 
+    median_std = np.median(
+        channel_std
+    )
+
+    # -----------------------------------------
+    # 4. Relative flat-channel detection
+    # -----------------------------------------
+
+    if median_std == 0:
+
+        return {
+            "usable": False,
+            "reason": "all_channels_flat",
+            "invalid_ratio": float(
+                invalid_ratio
+            )
+        }
+
+    relative_std = (
+        channel_std / median_std
+    )
+
     flat_channels = np.where(
-        channel_std < flat_std_threshold
+        relative_std < max_flat_channel_ratio
     )[0]
 
-    has_flat_channel = (
-        len(flat_channels) > 0
+    # -----------------------------------------
+    # 5. Too many flat channels
+    # -----------------------------------------
+
+    flat_ratio = (
+        len(flat_channels)
+        / eeg.shape[0]
     )
 
-    # Overall quality decision
-    usable = not (
-        has_too_many_invalid
-        or extreme_amplitude
-        or has_flat_channel
+    too_many_flat_channels = (
+        flat_ratio > 0.5
     )
+
+    # -----------------------------------------
+    # 6. Final decision
+    # -----------------------------------------
+
+    usable = not too_many_flat_channels
 
     reasons = []
 
-    if has_too_many_invalid:
+    if too_many_flat_channels:
         reasons.append(
-            "too_many_invalid_values"
-        )
-
-    if extreme_amplitude:
-        reasons.append(
-            "extreme_amplitude"
-        )
-
-    if has_flat_channel:
-        reasons.append(
-            "flat_channel"
+            "too_many_flat_channels"
         )
 
     if not reasons:
@@ -115,15 +128,15 @@ def check_eeg_quality(
         "invalid_ratio": float(
             invalid_ratio
         ),
-        "min_amplitude": min_value,
-        "max_amplitude": max_value,
+        "channel_std": channel_std.tolist(),
+        "median_std": float(
+            median_std
+        ),
         "flat_channels": flat_channels.tolist()
     }
 
 
 if __name__ == "__main__":
-
-    # Test with a clean synthetic EEG signal
 
     sampling_rate = 256
     duration = 30
@@ -164,8 +177,11 @@ if __name__ == "__main__":
     )
 
     print(
-        "Amplitude:",
-        result["min_amplitude"],
-        "to",
-        result["max_amplitude"]
+        "Median channel std:",
+        result["median_std"]
+    )
+
+    print(
+        "Flat channels:",
+        result["flat_channels"]
     )
