@@ -275,7 +275,7 @@ print(
 # ============================================================
 
 criterion, class_weights = get_weighted_loss(
-    train_df["label"].values,
+    train_df["label"].to_numpy(copy=True),
     device
 )
 
