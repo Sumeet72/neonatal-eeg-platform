@@ -38,7 +38,7 @@ RANDOM_STATE = 42
 
 # Safety switch:
 # Start with 1 fold to test the complete runner.
-MAX_FOLDS = 1
+MAX_FOLDS = 132
 
 
 # ============================================================
