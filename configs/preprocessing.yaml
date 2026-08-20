@@ -1,0 +1,23 @@
+sampling_frequency: 200
+
+window_seconds: 30
+stride_seconds: 15
+
+channels:
+  - F4-C4
+  - C4-O2
+  - F3-C3
+  - C3-O1
+  - T4-C4
+  - C4-Cz
+  - Cz-C3
+  - C3-T3
+
+filter:
+  enabled: true
+  low_frequency: 0.5
+  high_frequency: 40.0
+
+time_frequency:
+  method: stft
+  image_size: 128

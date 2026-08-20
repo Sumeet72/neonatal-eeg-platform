@@ -1,0 +1,8 @@
+num_classes: 2
+
+models:
+  - cnn
+  - eegnet
+  - cnn_bilstm
+  - resnet18
+  - cnn_transformer
