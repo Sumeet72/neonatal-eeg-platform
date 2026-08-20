@@ -199,20 +199,19 @@ class EEGDataset(Dataset):
         # ----------------------------------------
 
         return {
-            "spectrogram": spectrogram,
-            "label": torch.tensor(
-                label,
-                dtype=torch.long
-            ),
-            "subject_id": subject_id,
-            "dataset": str(
-                row["dataset"]
-            ),
-            "epoch_id": int(
-                row["epoch_id"]
-            ),
-            "quality": quality
-        }
+    "spectrogram": spectrogram,
+    "label": torch.tensor(
+        label,
+        dtype=torch.long
+    ),
+    "subject_id": subject_id,
+    "dataset": str(
+        row["dataset"]
+    ),
+    "epoch_id": int(
+        row["epoch_id"]
+    )
+}
 
 
 if __name__ == "__main__":
