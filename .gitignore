@@ -3,33 +3,54 @@ __pycache__/
 *.py[cod]
 *.pyd
 
-# Virtual environment
+# Virtual environments and secrets
 .venv/
+venv/
+.env
+.env.*
+!.env.example
 
-# Jupyter
+# Jupyter / IDE / OS
 .ipynb_checkpoints/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
 
-# Data
+# Raw EEG data (do not commit restricted or large source data)
+*.edf
+*.EDF
+dataset/
 data/raw/
 data/interim/
 data/processed/
 
-# Model files
+# Machine-specific local data paths
+configs/paths.yaml
+
+# Model weights and large binary artifacts
+*.pt
+*.pth
+*.ckpt
+*.onnx
 checkpoints/
 models/*.pth
 models/*.pt
-*.ckpt
 
-# Experiment outputs
+# Generated results: ignore by default, allow selected shareable outputs below
+results/*
+!results/final_graphs/
+results/final_graphs/*
+!results/final_graphs/*.png
+!results/final_evaluation.csv
+!results/threshold_analysis.csv
+!results/final_model/
+results/final_model/*
+!results/final_model/ResNet18_final_training_history.csv
+!results/final_model/model_metadata.json
+
+# Explicitly ignore bulky/private generated outputs even if nearby files are whitelisted
+results/stft_cache/
+results/inference/
+results/ResNet18_evaluation/
 experiments/
-results/
-
-# Environment
-.env
-
-# VS Code
-.vscode/
-
-# OS
-.DS_Store
-Thumbs.db
