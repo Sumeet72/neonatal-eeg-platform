@@ -8,7 +8,7 @@ from sklearn.model_selection import GroupShuffleSplit
 from torch.utils.data import DataLoader
 
 from src.data.cached_eeg_dataset import CachedEEGDataset
-from src.models.cnn import EEGCNN
+from src.models.ResNet18 import ResNet18EEG
 from src.training.losses import get_weighted_loss
 from src.training.trainer import train_model
 from src.utils.device import get_device
@@ -24,9 +24,8 @@ SEED = 42
 
 METADATA_FILE = "results/stft_cache/metadata.csv"
 
-PREDICTION_DIR = "results/loso_predictions"
-
-RESULTS_FILE = "results/loso_results.csv"
+PREDICTION_DIR = "results/ResNet18_loso_predictions"
+RESULTS_FILE = "results/ResNet18_loso_results.csv"
 
 BATCH_SIZE = 32
 EPOCHS = 5
@@ -358,7 +357,7 @@ for fold_number, test_subject in enumerate(
     # MODEL
     # ========================================================
 
-    model = EEGCNN(
+    model = ResNet18EEG(
         num_channels=9,
         num_classes=2
     ).to(device)
@@ -498,14 +497,15 @@ for fold_number, test_subject in enumerate(
             )
 
 
-            predictions = outputs.argmax(
-                dim=1
-            )
-
-
             seizure_probability = (
                 probabilities[:, 1]
             )
+
+            
+            THRESHOLD = 0.40
+            predictions = (
+                seizure_probability >= THRESHOLD
+            ).long()
 
 
             all_true.extend(
@@ -607,14 +607,15 @@ for fold_number, test_subject in enumerate(
     # ========================================================
     # SAVE PREDICTIONS
     # ========================================================
-
+    THRESHOLD = 0.40
     prediction_df = pd.DataFrame(
         {
             "subject_id": prediction_subjects,
             "epoch_id": prediction_epochs,
             "true_label": y_true,
             "predicted_label": y_pred,
-            "seizure_probability": y_probability
+            "seizure_probability": y_probability,
+            "threshold": THRESHOLD
         }
     )
 

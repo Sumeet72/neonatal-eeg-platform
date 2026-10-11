@@ -1,0 +1,7 @@
+Metric,CNN,ResNet18
+Accuracy,0.7639,0.8055
+Precision,0.2736,0.3476
+Sensitivity,0.5249,0.6155
+Specificity,0.7985,0.8329
+F1-score,0.3597,0.4443
+ROC-AUC,0.7191,0.8153

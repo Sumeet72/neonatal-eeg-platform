@@ -6,7 +6,7 @@ from sklearn.model_selection import GroupShuffleSplit
 from torch.utils.data import DataLoader
 
 from src.data.cached_eeg_dataset import CachedEEGDataset
-from src.models.cnn import EEGCNN
+from src.models.eegnet import EEGNet
 from src.training.losses import get_weighted_loss
 from src.training.trainer import train_model
 from src.utils.device import get_device
@@ -258,9 +258,9 @@ test_loader = DataLoader(
 # MODEL
 # ============================================================
 
-model = EEGCNN(
-    num_channels=9,
-    num_classes=2
+model = EEGNet(
+    channels=9,
+    classes=2
 ).to(device)
 
 print(
@@ -446,7 +446,7 @@ prediction_df = pd.DataFrame(
 )
 
 prediction_dir = (
-    "results/loso_predictions"
+    "results/eegnet_predictions"
 )
 
 import os

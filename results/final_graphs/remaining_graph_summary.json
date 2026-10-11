@@ -1,0 +1,11 @@
+{
+  "operating_threshold": 0.4,
+  "graphs_generated": [
+    "04_sensitivity_specificity_vs_threshold.png",
+    "05_f1_vs_threshold.png",
+    "06_CNN_vs_ResNet18.png",
+    "07_training_loss.png",
+    "08_training_accuracy.png"
+  ],
+  "note": "The 0.40 threshold is retained as the pre-specified operating threshold. The pooled-test threshold with maximum F1 is not used as the final operating threshold because selecting it from held-out test predictions would introduce test-set leakage."
+}
