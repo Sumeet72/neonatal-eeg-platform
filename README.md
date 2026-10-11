@@ -1,12 +1,116 @@
-# Neonatal EEG AI Platform
+# Neonatal EEG Seizure Detection Platform
 
-AI-powered neonatal EEG analysis platform.
+A research prototype for neonatal EEG analysis and seizure-epoch classification using signal preprocessing, short-time Fourier transform (STFT) features, and deep learning.
 
-## Project Status
+> **Research-use disclaimer:** This project is not a clinically validated medical device. Its predictions must not be used to diagnose or treat a newborn. Clinical use would require independent external validation, qualified EEG review, and the applicable regulatory process.
 
-AI environment setup completed.
+## Project overview
 
-- Python: 3.14.6
-- PyTorch: 2.13.0+cu126
-- CUDA: 12.6
-- GPU: NVIDIA GeForce RTX 3050 Laptop GPU
+The project combines the **Nathan/Helsinki** and **Sumit/O'Toole** datasets as required by the project specification. It processes EEG recordings into 30-second epochs, transforms each epoch into a multi-channel log-power STFT representation, trains classifiers, and evaluates generalization using Leave-One-Subject-Out (LOSO) cross-validation.
+
+### Combined dataset summary
+
+| Item | Count |
+|---|---:|
+| Subjects / babies | 132 |
+| EEG epochs | 26,904 |
+| Normal epochs | 23,505 |
+| Seizure epochs | 3,399 |
+
+The datasets are imbalanced. The Sumit/O'Toole dataset contributes 169 epochs, including 3 official seizure-positive epochs, so its direct contribution to seizure learning is limited. The combined dataset remains part of the main experiment.
+
+## Best reported model: adapted ResNet-18
+
+ResNet-18 was adapted to accept the project's 9-channel STFT input. The baseline is a custom EEG-CNN. Both were compared using the same combined dataset, 132-subject LOSO evaluation, and the reported operating threshold of 0.40.
+
+| Metric | Baseline EEG-CNN | ResNet-18 |
+|---|---:|---:|
+| Accuracy | 76.39% | **80.55%** |
+| Sensitivity / Recall | 52.49% | **61.55%** |
+| Specificity | 79.85% | **83.29%** |
+| Precision | 27.36% | **34.76%** |
+| F1-score | 35.97% | **44.43%** |
+| ROC-AUC | 0.7191 | **0.8153** |
+| PR-AUC | 0.2863 | **0.4590** |
+
+ResNet-18 improves all reported metrics at this threshold. However, precision remains limited and the false-positive count is substantial; this should be presented as a promising academic research prototype, not a clinical-grade detector.
+
+### ResNet-18 confusion counts at threshold 0.40
+
+| | Predicted normal | Predicted seizure |
+|---|---:|---:|
+| Actual normal | 19,578 | 3,927 |
+| Actual seizure | 1,307 | 2,092 |
+
+**Interpretation note:** because 87.4% of the combined epochs are normal, accuracy alone is not an adequate model-quality measure. Sensitivity, precision, F1, ROC-AUC and PR-AUC should be considered together. Threshold choice should ideally be made on validation data only; selecting a threshold from pooled held-out test predictions can introduce test-set selection bias.
+
+## Data representation and preprocessing
+
+- Input tensor shape: **(9, 129, 59)** — 9 EEG channels, 129 frequency bins, and 59 time bins.
+- Selected EEG channels: F3, F4, C3, C4, O1, O2, T3, T4, Cz.
+- Target sampling rate: 256 Hz.
+- Epoch duration: 30 seconds (7,680 samples per channel).
+- STFT: 256-sample FFT/window, 128-sample hop, Hann window, `center=False`.
+- Features: log power, `log10(power + 1e-10)`.
+- Imbalance handling: weighted cross-entropy loss.
+- Evaluation: subject-level Leave-One-Subject-Out cross-validation.
+
+## Repository structure
+
+```text
+configs/             YAML model, data, preprocessing and training settings
+scripts/             Dataset audit/build, STFT caching, LOSO and test scripts
+src/data/            EEG and cached-dataset loaders
+src/preprocessing/   Filtering, resampling, channel selection and epoching
+src/transforms/      STFT transform
+src/models/cnn.py    Baseline EEG-CNN
+src/training/        LOSO and loss utilities
+src/evaluation/      Metrics, ROC and evaluation report utilities
+docs/                ML methodology and experimental results
+requirements.txt     Python dependencies
+```
+
+The full experimental methodology, metric definitions, confusion counts, limitations and next steps are documented in [docs/ML_METHODOLOGY_AND_RESULTS.md](docs/ML_METHODOLOGY_AND_RESULTS.md).
+
+## Setup
+
+Use a supported Python environment and install dependencies:
+
+```bash
+python -m venv .venv
+```
+
+Windows PowerShell:
+
+```powershell
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+python scripts/check_environment.py
+```
+
+Dataset paths are machine-specific. Keep local absolute paths in an untracked `configs/paths.yaml` file or set paths through your local environment; do not commit personal directory paths. Do not commit raw EDF recordings, the generated STFT tensor cache, virtual environments, or model checkpoint files.
+
+Run repository scripts from the project root with module execution where appropriate, for example:
+
+```powershell
+python -m scripts.test_real_preprocessing
+python -m scripts.run_cached_loso
+```
+
+The LOSO command can take substantial time and requires the datasets plus the generated cache. Do not run it just to view the documented results.
+
+## Outputs and reproducibility
+
+Small, shareable output artifacts such as final plots, summary CSVs and training history can be committed after reviewing them for privacy and consistency. The trained checkpoint (`*.pt` / `*.pth`), raw EEG, cached tensors, and per-epoch prediction dumps should remain out of Git by default. The inference checkpoint can be recreated by running the training workflow on an authorized local copy of the data.
+
+## Limitations and next steps
+
+1. Address the substantial false-positive burden and modest seizure precision.
+2. Choose the operating threshold on validation data only and evaluate once on held-out subjects.
+3. Add event-level metrics such as seizure-event sensitivity, false alarms per hour, and detection latency.
+4. Save validation curves and assess overfitting explicitly.
+5. Perform independent external validation and obtain expert clinical evaluation before considering clinical use.
+
+## Acknowledgment
+
+The project uses the Nathan/Helsinki and Sumit/O'Toole EEG datasets. Follow the original dataset licences, access terms, and citation requirements when obtaining or reusing data.
