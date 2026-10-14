@@ -75,7 +75,7 @@ def calculate_metrics(y_true, y_pred, probabilities):
     )
     pr_auc = (
         float(average_precision_score(y_true, probabilities))
-        if np.any(y_true == 1) else None
+        if has_both_classes else None
     )
 
     return {
