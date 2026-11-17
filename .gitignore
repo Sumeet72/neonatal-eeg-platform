@@ -1,56 +1,57 @@
 # Python
-__pycache__/
-*.py[cod]
-*.pyd
-
-# Virtual environments and secrets
 .venv/
 venv/
+__pycache__/
+*.py[cod]
+
+# Secrets
 .env
 .env.*
 !.env.example
 
-# Jupyter / IDE / OS
-.ipynb_checkpoints/
-.vscode/
-.idea/
-.DS_Store
-Thumbs.db
+# Node
+node_modules/
+dist/
+build/
 
-# Raw EEG data (do not commit restricted or large source data)
-*.edf
-*.EDF
-dataset/
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Medical data
+backend/uploads/*
+backend/reports/*
+uploads/
+reports/
+
+# Logs
+*.log
+
+# Editor
+.vscode/
+# Research outputs and EEG-derived data
+results/
 data/raw/
-data/interim/
 data/processed/
 
-# Machine-specific local data paths
-configs/paths.yaml
+# Large archives
+*.zip
 
-# Model weights and large binary artifacts
+# EEG recordings
+*.edf
+*.bdf
+*.fif
+
+# Model weights and derived caches
 *.pt
 *.pth
 *.ckpt
-*.onnx
-checkpoints/
-models/*.pth
-models/*.pt
+*.npy
+*.npz
+*.pkl
+*.parquet
 
-# Generated results: ignore by default, allow selected shareable outputs below
-results/*
-!results/final_graphs/
-results/final_graphs/*
-!results/final_graphs/*.png
-!results/final_evaluation.csv
-!results/threshold_analysis.csv
-!results/final_model/
-results/final_model/*
-!results/final_model/ResNet18_final_training_history.csv
-!results/final_model/model_metadata.json
-
-# Explicitly ignore bulky/private generated outputs even if nearby files are whitelisted
-results/stft_cache/
-results/inference/
-results/ResNet18_evaluation/
-experiments/
+# Local backup files
+*.bak
+*.before_*.bak
