@@ -53,6 +53,10 @@ MANIFEST_FILE = Path(os.environ.get(
     "EEG_MIL_MANIFEST_FILE", "results/corrected_epoch_dataset/master_epochs.csv"
 ))
 SUMIT_TABLE_FILE = Path("results/sumit_epochs.csv")
+
+INCLUDE_SUMIT_TRAINING = os.environ.get(
+    "EEG_INCLUDE_SUMIT_TRAINING", "true"
+).strip().lower() in {"1", "true", "yes", "on"}
 OUTPUT_DIR = Path(os.environ.get(
     "EEG_MIL_OUTPUT_DIR", f"results/AllSumitMIL_{MODEL_NAME}_Nathan_LOSO"
 ))
@@ -470,6 +474,14 @@ def append_csv(path, frame, replace_subject=None):
 
 def write_summary(metadata, fold_metrics, device):
     predictions = pd.read_csv(PREDICTIONS_FILE) if PREDICTIONS_FILE.exists() else pd.DataFrame()
+
+    sumit_training_metadata = metadata.loc[
+        metadata["dataset"].eq("sumit")
+    ].copy()
+
+    if not INCLUDE_SUMIT_TRAINING:
+        sumit_training_metadata = sumit_training_metadata.iloc[0:0].copy()
+
     nathan = metadata.loc[metadata["dataset"].eq("nathan")]
     evaluated = int(fold_metrics["subject_id"].astype(str).nunique()) if not fold_metrics.empty else 0
     total_subjects = int(nathan["subject_id"].nunique())
@@ -480,14 +492,23 @@ def write_summary(metadata, fold_metrics, device):
         "total_nathan_test_subjects": total_subjects,
         "evaluated_nathan_windows": int(len(predictions)),
         "all_dataset_windows": int(len(metadata)),
-        "sumit_recordings_in_training": int(metadata.loc[metadata["dataset"].eq("sumit"), "recording_id"].nunique()),
-        "sumit_positive_recording_bags": int(metadata.loc[metadata["dataset"].eq("sumit") & metadata["recording_label"].eq(1), "recording_id"].nunique()),
+        "sumit_recordings_in_training": int(sumit_training_metadata["recording_id"].nunique()),
+        "sumit_positive_recording_bags": int(sumit_training_metadata.loc[sumit_training_metadata["recording_label"].eq(1), "recording_id"].nunique()),
+        "include_sumit_training": INCLUDE_SUMIT_TRAINING,
         "training_method": (
-    "Strong window-level cross entropy for Nathan + Sumit-negative windows; MIL disabled for ablation"
-    if BAG_LOSS_WEIGHT == 0
-    else "Strong window-level cross entropy for Nathan + Sumit-negative windows; max-pooling MIL recording-level loss for all Sumit seizure-positive recordings"
-),
-        "test_protocol": "Nathan-only subject-level LOSO; validation split is also Nathan-only. All Sumit recordings are in the training partition in each fold.",
+            "Nathan-only supervised window-level cross entropy; Sumit excluded from training"
+            if not INCLUDE_SUMIT_TRAINING
+            else (
+                "Strong window-level cross entropy for Nathan and Sumit-negative windows; MIL disabled for ablation"
+                if BAG_LOSS_WEIGHT == 0
+                else "Strong window-level cross entropy for Nathan and Sumit-negative windows; max-pooling MIL recording-level loss for positive Sumit recordings"
+            )
+        ),
+        "test_protocol": (
+            "Nathan-only subject-level LOSO; Sumit excluded from training."
+            if not INCLUDE_SUMIT_TRAINING
+            else "Nathan-only subject-level LOSO; all Sumit recordings are in training."
+        ),
         "shared_split_rule": "Sorted remaining Nathan subject IDs split with GroupShuffleSplit, validation_size=0.20, random_state=42+fold_number; same runner used for both model variants",
         "device": str(device),
         "batch_size": BATCH_SIZE,
@@ -1005,7 +1026,10 @@ def main():
         raise ValueError(f"Expected 79 Nathan test subjects; found {len(subjects)}.")
 
     print("=" * 72)
-    print(f"ALL 169 SUMIT RECORDINGS + NATHAN — MATCHED-SPLIT MIL LOSO ({MODEL_NAME.upper()})")
+    if INCLUDE_SUMIT_TRAINING:
+        print(f"ALL 169 SUMIT RECORDINGS + NATHAN ? MATCHED-SPLIT LOSO ({MODEL_NAME.upper()})")
+    else:
+        print(f"NATHAN-ONLY ? MATCHED-SPLIT LOSO ({MODEL_NAME.upper()})")
     print("=" * 72)
     print("Device:", device)
     print("Cache:", METADATA_FILE)
@@ -1014,7 +1038,10 @@ def main():
     print("Window labels:", metadata["label"].value_counts().sort_index().to_dict())
     print("Sumit recordings:", metadata.loc[metadata["dataset"].eq("sumit"), "recording_id"].nunique())
     print("Sumit recording labels:", metadata.loc[metadata["dataset"].eq("sumit")].drop_duplicates("recording_id")["recording_label"].value_counts().sort_index().to_dict())
-    print("All 169 Sumit recordings will be in each fold's training partition.")
+    if INCLUDE_SUMIT_TRAINING:
+        print("Combined training uses Nathan and Sumit.")
+    else:
+        print("Nathan-only training; Sumit excluded.")
     print("Validation and held-out test subjects: Nathan only; splits reproducible across model variants.")
     print("Batch:", BATCH_SIZE, "Epochs:", EPOCHS, "Patience:", PATIENCE, "MIL repeats:", BAG_REPEATS)
     print("Pretrained ResNet-18:", RESNET_PRETRAINED if MODEL_NAME == "resnet18" else "not applicable")
@@ -1043,19 +1070,35 @@ def main():
         train_nathan_df, validation_df, train_nathan_subjects, validation_subjects = split_nathan_subjects(
             nathan_meta, test_subject, fold_number
         )
-        sumit_train_df = metadata.loc[metadata["dataset"].eq("sumit")].copy()
-        train_df = pd.concat([train_nathan_df, sumit_train_df], ignore_index=True)
+        available_sumit_df = metadata.loc[
+            metadata["dataset"].eq("sumit")
+        ].copy()
 
-        # All Sumit recordings are training data; no Sumit rows appear in validation/test.
+        sumit_train_df = (
+            available_sumit_df
+            if INCLUDE_SUMIT_TRAINING
+            else available_sumit_df.iloc[0:0].copy()
+        )
+
+        train_df = pd.concat(
+            [train_nathan_df, sumit_train_df],
+            ignore_index=True
+        )
+
+        # Sumit is included only when requested; validation and test remain Nathan-only.
         if not validation_df["dataset"].eq("nathan").all() or not test_df["dataset"].eq("nathan").all():
             raise RuntimeError("Validation/test sets must contain Nathan data only.")
         if set(train_nathan_subjects) & set(validation_subjects) or test_subject in set(train_nathan_subjects) | set(validation_subjects):
             raise RuntimeError("Nathan subject leakage detected in shared split.")
-        if len(sumit_train_df["recording_id"].unique()) != 169:
+        if INCLUDE_SUMIT_TRAINING and len(sumit_train_df["recording_id"].unique()) != 169:
             raise RuntimeError("Not all Sumit recordings are represented in training.")
+
+        if not INCLUDE_SUMIT_TRAINING and not sumit_train_df.empty:
+            raise RuntimeError("Sumit data unexpectedly entered Nathan-only training.")
         strong_train = train_df.loc[train_df["label"].isin([0, 1])]
         print(f"Windows — train total {len(train_df):,}; supervised {len(strong_train):,}; validation {len(validation_df):,}; test {len(test_df):,}")
-        print(f"Subjects — Nathan train {len(train_nathan_subjects)}, validation {len(validation_subjects)}, test 1; Sumit recordings in train 169")
+        print(f"Subjects ? Nathan train {len(train_nathan_subjects)}, validation {len(validation_subjects)}, test 1")
+        print("Sumit recordings in train:", sumit_train_df["recording_id"].nunique())
         print(f"Validation subjects: {','.join(validation_subjects)}")
 
         started = time.time()
